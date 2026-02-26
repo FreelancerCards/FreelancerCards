@@ -85,7 +85,7 @@
     "autoprefixer": "^10.4.23",
     "cli-table3": "^0.6.5",
     "drizzle-kit": "^0.31.8",
-    "eslint": "^9.39.2",
+    "eslint": "^10.0.2",
     "eslint-config-next": "16",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
