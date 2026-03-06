@@ -1,815 +1,340 @@
-# GitHub Contributor Analytics
+<div align="center">
 
-A modern analytics pipeline for tracking and analyzing GitHub contributions across repositories. The system processes contributor data, generates AI-powered summaries, and maintains a leaderboard of developer activity.
+<img src="https://cdn.prod.website-files.com/69082c5061a39922df8ed3b6/6971864f1c9d5744062b71fd_logogogogo.png" alt="Freelancer" width="120" />
 
-## Prerequisites
+# FREELANCER
 
-- [Bun](https://bun.sh/) (recommended) or Node.js 18+
-- GitHub Personal Access Token with repo scope
-- [OpenRouter API Key](https://openrouter.ai/) (optional, for AI summaries)
-- [uv](https://astral.sh/uv) (optional, for syncing from production DB)
+**A collectible card game. Built from Shaw's repo. Launched on Solana.**
 
-## Features
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![JavaScript](https://img.shields.io/badge/JavaScript-96.4%25-F7DF1E?logo=javascript&logoColor=black)](https://github.com/FreelancerCards)
+[![Node.js](https://img.shields.io/badge/Node.js-Server-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Redis](https://img.shields.io/badge/Redis-State%20Engine-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Solana](https://img.shields.io/badge/Solana-Token%20Live-9945FF?logo=solana&logoColor=white)](https://solana.com/)
+[![pump.fun](https://img.shields.io/badge/pump.fun-Fair%20Launch-00E4B8)](https://pump.fun/)
+[![Twitter Follow](https://img.shields.io/twitter/follow/FreelancerGame?style=social)](https://twitter.com/FreelancerGame)
 
-- Tracks pull requests, issues, reviews, and comments
-- Calculates contributor scores based on activity and impact
-- Generates AI-powered summaries of contributions
-- Exports daily summaries to JSON files
-- Maintains contributor expertise levels and focus areas
-- Interactive contributor profile pages
-- Activity visualizations and metrics
-- Daily, weekly, and monthly reports
-- Smart contributor scoring system
+[Play](https://x.com/freelancergame) | [Medium](https://medium.com/@freelancergame/freelancer-is-live-the-game-the-token-today-4dbc9d11cefe) | [Twitter](https://twitter.com/FreelancerGame) | [Original Repo](https://github.com/lalalune/freelancer)
 
-## Wallet Linking (Optional Feature)
+</div>
 
-Contributors can optionally link their Ethereum and Solana wallet addresses to their GitHub profiles. When configured, users can authenticate via GitHub OAuth and store wallet addresses in their profile README.
+---
 
-**Setup:** See [`auth-worker/README.md`](auth-worker/README.md) for Cloudflare Worker deployment and OAuth configuration.
+<img src="https://cdn.prod.website-files.com/69082c5061a39922df8ed3b6/697187704730a92b6fd4ccbd_4234324324311.png" alt="Freelancer Banner" width="100%" />
 
-**Required secrets (if enabling):**
+---
 
-- `NEXT_PUBLIC_GITHUB_CLIENT_ID` - GitHub OAuth App Client ID
-- `NEXT_PUBLIC_AUTH_WORKER_URL` - Deployed Cloudflare Worker URL
+## The Story
 
-**Note:** The leaderboard works perfectly fine without this feature. It's purely additive.
+This project started with a DM from Shaw Walters ([@shawmakesmagic](https://twitter.com/shawmakesmagic)) -- the creator of ElizaOS and one of the most prolific builders in the AI x crypto space. He had a collectible card game repo sitting on GitHub. The architecture was solid: client-server split, Redis-backed state, WebSocket multiplayer. But it needed someone to take it from prototype to product.
 
-## Setup
+He paid us $1,000 to build it out, polish the gameplay, and launch a token on pump.fun. No pitch deck. No roadmap committee. Just "here's the repo, here's the bag, make it happen."
 
-1. Install dependencies:
+<div align="center">
+<img src="https://cdn.prod.website-files.com/69082c5061a39922df8ed3b6/69aaf82699e6dafac3731a65_shaw-ezgif.com-optimize.gif" alt="Shaw endorsing Freelancer" width="480" />
+
+*Shaw giving the official stamp of approval.*
+</div>
+
+So we built.
+
+---
+
+## What Is Freelancer
+
+Freelancer is a real-time, web-based collectible card game. Players build decks, queue into matches, and battle opponents with cards that have mana costs, effects, and triggered abilities. Every move is validated server-side. No client-side cheating. No exploits.
+
+Think the strategic depth of Magic: The Gathering with the speed and accessibility of a browser game.
+
+```
+freelancer/
+├── packages/
+│   ├── client/          # Web-based game UI
+│   └── server/          # Node.js game server
+├── package.json         # Yarn workspaces config
+├── yarn.lock
+└── README.md
+```
+
+**Stack breakdown:**
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Frontend | Vanilla JavaScript | Game UI, card rendering, animations |
+| Backend | Node.js | Game logic, move validation, matchmaking |
+| State | Redis | Pub/sub for real-time sync, persistent game state |
+| Transport | WebSockets | Low-latency multiplayer communication |
+| Token | Solana (pump.fun) | Community token, fair launch |
+
+---
+
+## Getting Started
+
+You need Docker for Redis. Everything else runs on Node.js with Yarn.
 
 ```bash
-bun install
+# 1. Clone the repo
+git clone https://github.com/FreelancerCards/freelancer.git
+cd freelancer
+
+# 2. Install dependencies
+yarn install
+
+# 3. Pull and run Redis
+sudo docker pull redis
+sudo docker run -it -p 6379:6379 redis
+
+# 4. Start the game server (terminal 1)
+yarn start:server
+
+# 5. Start the client (terminal 2)
+yarn start:client
 ```
 
-2. Set up environment variables in `.env` using `.env.example` for reference:
+That's it. You're in a game lobby. Open two browser tabs to test multiplayer locally.
 
-```bash
-# Required for Github Ingest
-GITHUB_TOKEN=your_github_personal_access_token_here
-# Required for AI summaries
-OPENROUTER_API_KEY=your_api_key_here
-# configure local environment to use cheaper models
-LARGE_MODEL=openai/gpt-4o-mini
+---
 
-# Optional site info (auto-detected in CI if not set)
-SITE_URL=https://your-deployment-url.com
-SITE_NAME="Contributor Leaderboard"
+## Dev Diary: How We Built It
 
-# Optional: For wallet linking feature
-NEXT_PUBLIC_GITHUB_CLIENT_ID=
-NEXT_PUBLIC_AUTH_WORKER_URL=
-```
+### Week 1 -- Mapping the Engine
 
-Then load the environment variables:
+First thing we did was read every line of Shaw's original code. The game engine handles card interactions, turn resolution, and state management through a clean validation pipeline. Every action goes through the server before anything renders on-screen.
 
-```bash
-source .envrc
-# Or if using direnv: direnv allow
-```
+The core pattern looks like this:
 
-3. Configure repositories to track in `config/pipeline.config.ts`. See the config file for the full schema and options.
+```javascript
+// Server-side card validation
+const validateCardPlay = (gameState, playerId, cardId) => {
+  const player = gameState.players[playerId];
+  const card = player.hand.find(c => c.id === cardId);
 
-4. Initialize Database
-
-You can either initialize an empty database or sync the latest data from production:
-
-Option A - Initialize Empty Database:
-
-```bash
-# Apply migrations
-bun run db:migrate
-```
-
-Option B - Sync Production Data:
-
-If you want to download all historical data from the production data branch instead of having to reingest / generate it on your own, you can use the data:sync command, which depends on [uv](https://astral.sh/uv).
-
-```bash
-# Install uv first if you don't have it (required for database restoration)
-
-pipx install uv  # Recommended method
-# OR
-brew install uv  # macOS with Homebrew
-
-# More installation options: https://docs.astral.sh/uv/getting-started/installation/
-```
-
-```bash
-
-# Download the latest data from production
-bun run data:sync
-# Or, if you are on a fork:
-bun run data:sync --remote upstream
-# This will:
-# - Fetch the latest data from the _data branch
-# - Copy all data files (stats, summaries, etc.)
-# - Restore the SQLite database from the diffable dump
-
-# If you made local changes to the schema that don't exist in prod DB:
-bun run db:generate
-bun run db:migrate
-```
-
-The data sync utility supports several options:
-
-```bash
-# View all options
-bun run data:sync --help
-
-# Skip confirmation prompts (useful in scripts)
-bun run data:sync -y
-
-# Sync from a different remote (if you've added one)
-bun run data:sync --remote upstream
-
-# Skip database restoration (only sync generated JSON/MD files)
-bun run data:sync --skip-db
-
-# Delete all local data and force sync
-bun run data:sync --force
-```
-
-After syncing or initializing the database, you can explore it using Drizzle Studio:
-
-```bash
-# Launch the database explorer
-bun run db:studio
-```
-
-If you encounter any issues with Drizzle Studio due to Node.js version mismatches, you can use a different SQLite browser tool like [SQLite Browser](https://sqlitebrowser.org/).
-
-## Quick Start
-
-```bash
-# Ingest recent data
-bun run pipeline ingest --days 90
-
-# Process and calculate scores
-bun run pipeline process
-
-# Build the site
-bun run build
-```
-
-## Commands and Capabilities
-
-You can see the main pipelines and their usages with these commands below:
-
-```bash
-bun run pipeline ingest -h
-bun run pipeline process -h
-bun run pipeline export -h
-bun run pipeline summarize -h
-```
-
-### Data Ingestion
-
-```bash
-# Ingest latest Github data (default since last fetched, or 7 days)
-bun run pipeline ingest
-
-# Ingest from beginning
-bun run pipeline ingest --after 2024-10-15
-
-# Ingest with specific date range
-bun run pipeline ingest --after 2025-01-01 --before 2025-02-20
-
-# Ingest data for a specific number of days
-bun run pipeline ingest --days 30 --before 2024-03-31
-
-# Ingest with verbose logging
-bun run pipeline ingest -v
-
-# Ingest with custom config file
-bun run pipeline ingest --config custom-config.ts
-```
-
-### Data Processing and Analysis
-
-```bash
-# Process and analyze all repositories
-bun run pipeline process
-
-# Force recalculation of scores even if they already exist
-bun run pipeline process --force
-
-# Process specific repository
-bun run pipeline process --repository owner/repo
-
-# Process with verbose logging
-bun run pipeline process -v
-
-# Process with custom config
-bun run pipeline process --config custom-config.ts
-
-```
-
-### Generating Stats and Exports
-
-```bash
-# Export repository stats (defaults to 30 days)
-bun run pipeline export
-
-# Export with specific date range
-bun run pipeline export --after 2025-01-01 --before 2025-02-20
-
-# Export for a specific number of days
-bun run pipeline export --days 60
-
-# Export all data since contributionStartDate
-bun run pipeline export --all
-
-# Export for specific repository
-bun run pipeline export -r owner/repo
-
-# Export to custom directory
-bun run pipeline export --output-dir ./custom-dir/
-
-# Export with verbose logging
-bun run pipeline export -v
-
-# Regenerate and overwrite existing files
-bun run pipeline export --force
-```
-
-### AI Summary Generation
-
-Generated project summaries are stored in `data/<owner_repo>/<interval>/summaries/summary_<date>.json`.
-
-```bash
-# Generate repository-level summaries
-bun run pipeline summarize -t repository
-
-# Generate overall summaries (after repository summaries are generated)
-bun run pipeline summarize -t overall
-
-# Generate contributor summaries
-bun run pipeline summarize -t contributors
-
-# Generate summaries with specific date range
-bun run pipeline summarize -t repository --after 2025-01-01 --before 2025-02-20
-
-# Force overwrite existing summaries
-bun run pipeline summarize -t repository --force
-
-# Generate and overwrite summaries for a specific number of days (default 7 days)
-bun run pipeline summarize -t repository --days 90 --force
-
-# Generate repository summaries for all data since contributionStartDate
-bun run pipeline summarize -t repository --all
-
-# Generate summaries for a specific repository
-bun run pipeline summarize -t repository --repository owner/repo
-
-# Generate only daily and weekly contributor summaries
-bun run pipeline summarize -t contributors --daily --weekly
-
-# Generate summaries with verbose logging
-bun run pipeline summarize -t repository -v
-
-# Generate summaries for a specific contributor only
-bun run pipeline summarize -t contributors -u username
-```
-
-By default, the summarize command wont regenerate summaries that already exist for a given day. To regenerate summaries, you can pass in the -f/--force flag.
-
-#### Lifetime Summaries
-
-Generate all-time contributor briefings with strategic insights (manual generation only, not automated):
-
-```bash
-# Single user (recommended for testing)
-bun run pipeline summarize -t contributors --lifetime -u username
-
-# All users (expensive - generates AI summaries for every contributor)
-bun run pipeline summarize -t contributors --lifetime --force
-```
-
-**Note:** Lifetime summaries are memory-intensive and make many AI calls. Always use the `-u/--username` filter when testing prompt changes or debugging.
-
-### Static JSON API
-
-The pipeline generates static JSON API endpoints that can be consumed by external tools, dashboards, or AI agents. These files are generated during pipeline execution and served as static files.
-
-#### Leaderboard API
-
-```bash
-# Generate leaderboard API endpoints
-bun run pipeline export-leaderboard
-
-# With custom limit (default 100, 0 = unlimited)
-bun run pipeline export-leaderboard --limit 50
-
-# Output to custom directory
-bun run pipeline export-leaderboard --output-dir ./custom-dir/
-```
-
-**Endpoints:**
-
-| Endpoint                                    | Description                       |
-| ------------------------------------------- | --------------------------------- |
-| `/api/leaderboard-monthly.json`             | Current month's leaderboard       |
-| `/api/leaderboard-weekly.json`              | Current week's leaderboard        |
-| `/api/leaderboard-lifetime.json`            | All-time leaderboard              |
-| `/api/contributors/{username}/profile.json` | Complete character sheet for user |
-| `/api/index.json`                           | API discovery endpoint            |
-
-**API Base URL:** `https://{your-domain}/api/`
-
-For GitHub Pages deployments, your base URL follows this pattern:
-
-- **Org/user site** (`username.github.io` repo): `https://{username}.github.io/api/`
-- **Project site** (any other repo): `https://{username}.github.io/{repo-name}/api/`
-
-**Response structure:**
-
-```json
-{
-  "version": "1.0",
-  "period": "monthly",
-  "startDate": "2025-01-01",
-  "endDate": "2025-01-31",
-  "generatedAt": "2025-01-15T12:00:00Z",
-  "totalUsers": 150,
-  "leaderboard": [
-    {
-      "rank": 1,
-      "username": "contributor1",
-      "avatarUrl": "https://...",
-      "characterClass": "Maintainer",
-      "tier": "elite",
-      "score": 1250,
-      "prScore": 800,
-      "issueScore": 200,
-      "reviewScore": 150,
-      "commentScore": 100,
-      "wallets": { "solana": "...", "ethereum": "..." },
-      "focusAreas": [
-        {
-          "tag": "core",
-          "score": 565.5,
-          "percentage": 45.2,
-          "rank": 3,
-          "totalInArea": 45
-        }
-      ],
-      "scoreBreakdown": {
-        "total": 1250,
-        "tier": "elite",
-        "percentile": 95.3,
-        "characterClass": "Maintainer",
-        "distribution": {
-          "prs": { "score": 800, "percentage": 64.0, "label": "Builder" },
-          "issues": { "score": 200, "percentage": 16.0, "label": "Hunter" },
-          "reviews": { "score": 150, "percentage": 12.0, "label": "Reviews" },
-          "comments": { "score": 100, "percentage": 8.0, "label": "Engagement" }
-        }
-      },
-      "achievements": [
-        { "type": "level", "tier": "elite", "earnedAt": "2024-11-15T10:00:00Z" }
-      ],
-      "profile": {
-        "contributorType": "maintainer",
-        "prMergeRate": 93.3,
-        "reviewActivity": "high"
-      },
-      "links": {
-        "profile": "https://elizaos.github.io/profile/contributor1",
-        "profileApi": "https://elizaos.github.io/api/contributors/contributor1/profile.json",
-        "summary": "https://elizaos.github.io/api/summaries/contributors/contributor1/day/latest.json",
-        "github": "https://github.com/contributor1"
-      }
-    }
-  ]
-}
-```
-
-**Character System:** Leaderboard entries include MMORPG-style progression:
-
-- **Tiers:** beginner → regular → active → veteran → elite → legend (based on total score)
-- **Classes:** Builder (PRs), Hunter (Issues), Scribe (Docs), Maintainer (Builder + Reviews), Pathfinder (Builder + Hunter)
-- **Focus Areas:** Top 3 expertise tags with global rankings (e.g., "#3 in core out of 45 contributors")
-- **Percentile:** Shows what % of all contributors this user outscores
-
-See the [API documentation page](/api) for complete schemas and examples.
-
-#### Summary API
-
-Summaries are generated alongside markdown files during the `summarize` command. JSON API artifacts include metadata for caching and validation.
-
-**Endpoints:**
-
-| Endpoint Pattern                                                | Description                         |
-| --------------------------------------------------------------- | ----------------------------------- |
-| `/api/summaries/overall/{interval}/{date}.json`                 | Overall summary for a specific date |
-| `/api/summaries/overall/{interval}/latest.json`                 | Most recent overall summary         |
-| `/api/summaries/overall/{interval}/index.json`                  | Index of all overall summaries      |
-| `/api/summaries/repos/{owner}_{repo}/{interval}/{date}.json`    | Repository summary                  |
-| `/api/summaries/repos/{owner}_{repo}/{interval}/latest.json`    | Most recent repo summary            |
-| `/api/summaries/repos/{owner}_{repo}/{interval}/index.json`     | Index of all repo summaries         |
-| `/api/summaries/contributors/{username}/{interval}/{date}.json` | Contributor summary                 |
-| `/api/summaries/contributors/{username}/{interval}/latest.json` | Most recent contributor summary     |
-| `/api/summaries/contributors/{username}/{interval}/index.json`  | Index of contributor summaries      |
-| `/api/summaries/contributors/{username}/lifetime.json`          | All-time contributor summary        |
-
-Where `{interval}` is one of: `day`, `week`, `month` (for overall/repos/contributors), or `lifetime` (contributors only)
-
-**Response structure:**
-
-```json
-{
-  "version": "1.0",
-  "type": "overall",
-  "interval": "day",
-  "date": "2025-01-15",
-  "generatedAt": "2025-01-15T23:00:00Z",
-  "sourceLastUpdated": "2025-01-15T23:00:00Z",
-  "contentFormat": "markdown",
-  "contentHash": "sha256...",
-  "entity": { "repoId": "owner/repo" },
-  "content": "# Summary\n\n..."
-}
-```
-
-**Index structure:**
-
-```json
-{
-  "version": "1.0",
-  "type": "overall",
-  "interval": "day",
-  "generatedAt": "2025-01-15T23:00:00Z",
-  "items": [
-    {
-      "date": "2025-01-15",
-      "sourceLastUpdated": "...",
-      "contentHash": "...",
-      "path": "2025-01-15.json"
-    }
-  ]
-}
-```
-
-#### Backfilling JSON API
-
-If you have existing summaries in the database that need JSON export (e.g., from before this feature was added):
-
-```bash
-# Export all summaries to JSON
-bun run pipeline export-summaries
-
-# Export specific type
-bun run pipeline export-summaries -t overall
-bun run pipeline export-summaries -t repository
-bun run pipeline export-summaries -t contributor
-
-# Export specific interval
-bun run pipeline export-summaries --interval day
-bun run pipeline export-summaries --interval week
-
-# Dry run to see what would be exported
-bun run pipeline export-summaries --dry-run
-```
-
-### Database Management
-
-```bash
-# Generate database migration files
-bun run db:generate
-
-# Apply database migrations
-bun run db:migrate
-
-# Launch interactive database explorer
-bun run db:studio
-```
-
-### Website Generation
-
-```bash
-# Build and generate contributor profile pages
-bun run build
-
-# View the site
-bunx serve@latest out
-```
-
-## Automation Options
-
-### Local Automation
-
-For simple local or server deployments without GitHub Actions:
-
-```bash
-# Continuous daily automation (runs every 24 hours)
-./scripts/daily-automation.sh
-```
-
-This script runs the complete pipeline sequence (`ingest → process → export → summarize`) continuously. Perfect for development environments or simple server setups. See `scripts/README.md` for more automation utilities.
-
-## CI/CD and Data Management
-
-The project uses GitHub Actions for automated data processing, summary generation, and deployment. The system maintains separate branches for code and data to optimize Git history management.
-
-### GitHub Actions Workflows
-
-- **Run Pipelines (`run-pipelines.yml`)**: Runs daily at 23:00 UTC to fetch GitHub data, process it, and generate summaries
-
-  - Runs the full `ingest → process → export → summarize` pipeline chain
-  - Maintains data in a dedicated `_data` branch
-  - Can be manually triggered from Github Actions tab with custom options:
-    - Date ranges and forced regeneration
-    - Interval selection (daily/weekly/monthly)
-    - Lifetime summary generation (opt-in, manual only)
-    - Username filtering for single-user testing
-  - Runs repository and overall summaries daily, but only runs contributor summaries on Sundays
-
-- **Generate Summaries (`generate-summaries.yml`)**: AI summary generation workflow (runs after pipeline completion or manually)
-
-  - Can be manually triggered for selective summary generation
-  - Supports lifetime summary generation with `lifetime_summaries` checkbox
-  - Allows filtering to specific username with `username` input field
-  - Useful for testing prompt changes or regenerating specific summaries
-
-- **Deploy to GitHub Pages (`deploy.yml`)**: Builds and deploys the site
-
-  - Triggered on push to main, manually, or after successful pipeline run
-  - Restores data from the `_data` branch before building
-  - Generates directory listings for the data folder
-  - Deploys to GitHub Pages
-
-- **PR Checks (`pr-checks.yml`)**: Quality checks for pull requests
-  - Runs linting, typechecking, and build verification
-  - Tests the pipeline on a small sample of data
-  - Verifies migrations are up to date when schema changes
-
-### Data Management Architecture
-
-The project uses a specialized data branch strategy to optimize both code and data storage:
-
-1. **Separate Data Branch**: All pipeline data is stored in a separate branch (default: `_data`)
-
-   - Keeps the main branch clean and focused on code
-   - Prevents data changes from cluttering code commits
-   - Enables efficient data restoration in CI/CD and deployment
-
-2. **Database Serialization**: Uses the [sqlite-diffable](https://github.com/simonw/sqlite-diffable) utility to store database content as version-controlled files
-
-   - Converts SQLite database to diffable text files in `data/dump/`
-   - Enables Git to track database changes efficiently
-   - Provides an audit trail
-   - Allows for database "time travel" via git history
-
-3. **Custom GitHub Actions**: Two custom actions are used in the workflows:
-   - `restore-db`: Restores data from the data branch using sparse checkout
-   - `pipeline-data`: Manages worktrees to retrieve and update data in the \_data branch
-
-This architecture ensures:
-
-- Efficient Git history management (code changes separate from data changes)
-- Reliable CI/CD workflows with consistent data access
-- Simplified deployment with automatic data restoration
-- Effective collaboration without data conflict issues
-
-## Deploying Your Own Instance
-
-### GitHub Pages Configuration
-
-This project is configured to deploy to GitHub Pages with **automatic base path detection**. The deploy workflow automatically determines whether your repo is:
-
-- An **organization/user site** (`username.github.io`) → deploys to root path
-- A **project site** (any other repo name) → deploys to `/${repo-name}`
-
-If you fork this repository:
-
-1. **Enable GitHub Pages**:
-
-   - Go to repository Settings → Pages
-   - Source: "GitHub Actions"
-   - Save
-
-2. **Add Required Secrets** (Settings → Secrets and variables → Actions):
-
-   - `OPENROUTER_API_KEY` - Required for AI summary generation
-   - `NEXT_PUBLIC_GITHUB_CLIENT_ID` - Optional, for wallet linking
-   - `NEXT_PUBLIC_AUTH_WORKER_URL` - Optional, for wallet linking
-
-3. **Enable Workflows**:
-
-   - Go to Actions tab
-   - Enable workflows if prompted
-   - Manually trigger "Run Pipelines" to generate initial data
-
-4. **Access Your Site**:
-   - After successful deployment: `https://your-username.github.io/your-repo-name/`
-
-### Deployment Architecture
-
-The site automatically deploys via GitHub Actions:
-
-- **Data Generation**: `run-pipelines.yml` runs daily at 23:00 UTC
-  - Stores data in `_data` branch (SQLite dumps, stats, summaries)
-  - Never commits large binary files to main branch
-- **Site Build**: `deploy.yml` triggers on push to main or after pipeline runs
-  - Auto-detects `BASE_PATH` and `SITE_URL` from repository name
-  - Restores data from `_data` branch
-  - Builds Next.js static site
-  - Deploys to GitHub Pages
-
-**Note**: To override auto-detection, set `BASE_PATH` and `SITE_URL` secrets in your repository settings.
-
-## Development
-
-### Taskmaster for AI-Assisted Development
-
-The project is set up to work with [Taskmaster](https://github.com/eyaltoledano/claude-task-master), an AI-powered task management tool. You can use it directly via the `task-master` command-line interface (CLI) or through its MCP server for integration with development environments like Cursor.
-
-#### MCP Setup (for IDE Integration)
-
-To use Taskmaster's AI capabilities within an integrated development environment, you'll need to configure the MCP server. Add the following to your IDE's MCP settings file (e.g., `.cursor/mcp.json` in your project or a global user setting):
-
-```json
-{
-  "mcpServers": {
-    "task-master-ai": {
-      "command": "npx",
-      "args": ["-y", "--package=task-master-ai", "task-master-ai"],
-      "env": {
-        "PERPLEXITY_API_KEY": "YOUR-KEY-HERE",
-        "OPENROUTER_API_KEY": "YOUR-KEY-HERE"
-      }
-    }
+  if (!card) {
+    return { valid: false, reason: 'Card not in hand' };
   }
-}
+
+  if (player.mana < card.cost) {
+    return {
+      valid: false,
+      reason: `Need ${card.cost} mana, have ${player.mana}`
+    };
+  }
+
+  if (gameState.activePlayer !== playerId) {
+    return { valid: false, reason: 'Not your turn' };
+  }
+
+  return { valid: true, card };
+};
 ```
 
-You can add other API keys for providers like Anthropic (`ANTHROPIC_API_KEY`) or Google (`GOOGLE_API_KEY`) to the `env` object. To use different models, you can configure them via the `task-master models` command after setup.
+No trust on the client. The server is the single source of truth. This is a non-negotiable for any multiplayer card game -- you cannot let the browser decide whether a play is legal.
 
-For more detailed guides, refer to the official Taskmaster documentation:
+### Week 2 -- Making Cards Feel Real
 
-- [Tutorial](https://github.com/eyaltoledano/claude-task-master/blob/main/docs/tutorial.md)
-- [Configuration Guide](https://github.com/eyaltoledano/claude-task-master/blob/main/docs/configuration.md)
+A card game without satisfying interactions is a spreadsheet with extra steps. We spent the second week entirely on game feel: the weight of a card leaving your hand, the impact when it lands, the feedback loop that makes you want to play another round.
 
-### TypeScript Pipeline
+```javascript
+// Card play animation
+const animateCardPlay = (cardEl, targetSlot) => {
+  const start = cardEl.getBoundingClientRect();
+  const end = targetSlot.getBoundingClientRect();
 
-The project uses a TypeScript-based pipeline for data processing. See [Pipeline Documentation](cli/pipelines.md) for detailed information about:
+  const dx = end.left - start.left;
+  const dy = end.top - start.top;
 
-- Basic usage and commands
-- Pipeline architecture and components
-- Configuration options
-- Creating custom pipelines
-- Available customization points
+  cardEl.style.transition = 'none';
+  cardEl.style.transform = 'translate(0,0) scale(1)';
 
-### Updating schema
+  requestAnimationFrame(() => {
+    cardEl.style.transition =
+      'all 0.4s cubic-bezier(0.22, 1, 0.36, 1)';
+    cardEl.style.transform =
+      `translate(${dx}px, ${dy}px) scale(0.85)`;
+    cardEl.style.boxShadow =
+      '0 20px 60px rgba(0, 212, 170, 0.3)';
 
-If you need to modify the database schema (in `src/lib/data/schema.ts`), follow these steps:
+    setTimeout(() => {
+      targetSlot.classList.add('impact-flash');
+      playSound('card-slam');
+    }, 380);
+  });
+};
+```
 
-1.  Make your changes to the schema file
-2.  Generate migration files:
+CSS-driven animations with `requestAnimationFrame` for 60fps card movement. The elastic easing (`cubic-bezier(0.22, 1, 0.36, 1)`) gives cards a natural deceleration that feels physical. Small detail, massive difference in how the game feels to play.
+
+### Week 3 -- Redis and Multiplayer
+
+The multiplayer layer is built on Redis pub/sub. Every game gets its own channel. State mutations are atomic writes. Disconnects are handled gracefully with a 5-minute reconnect window.
+
+```javascript
+const Redis = require('ioredis');
+const publisher = new Redis();
+const subscriber = new Redis();
+
+const updateGameState = async (gameId, action) => {
+  const state = await getGameState(gameId);
+  const newState = applyAction(state, action);
+
+  // Atomic write -- no race conditions
+  await publisher.set(
+    `game:${gameId}`,
+    JSON.stringify(newState),
+    'EX', 3600
+  );
+
+  // Broadcast to all players in this match
+  publisher.publish(
+    `game:${gameId}:updates`,
+    JSON.stringify({
+      type: 'STATE_UPDATE',
+      state: sanitizeForPlayer(newState),
+      action
+    })
+  );
+};
+
+const handleDisconnect = async (playerId, gameId) => {
+  await publisher.set(
+    `player:${playerId}:disconnected`,
+    Date.now(),
+    'EX', 300  // 5 minute reconnect window
+  );
+};
+```
+
+We stress-tested this with simultaneous games, rapid card plays, forced disconnects, and reconnect floods. Redis held up. The pub/sub model means the server never polls -- it reacts. State is always consistent because every write is atomic and every read is from the single Redis source.
+
+### Week 4 -- Token Launch
+
+Stealth launched on pump.fun. No presale. No whitelist. No insiders. Fair launch with Shaw's endorsement.
+
+---
+
+## Token Details
+
+```
+Token:        $FREELANCER
+Platform:     pump.fun (Solana)
+Launch:       March 6, 2026
+Type:         Stealth / Fair Launch
+Dev Address:  miLtonJTjXf1v6ue3QGWmmJtYCjrKXuLg74bve2UeyC
+```
+
+The dev address is public. Verify everything on-chain. That's the point.
+
+Read the full launch announcement on [Medium](https://medium.com/@freelancergame/freelancer-is-live-the-game-the-token-today-4dbc9d11cefe).
+
+---
+
+## Architecture
+
+```
+                    +------------------+
+                    |    Browser UI    |
+                    |  (Vanilla JS)    |
+                    +--------+---------+
+                             |
+                         WebSocket
+                             |
+                    +--------+---------+
+                    |   Game Server    |
+                    |   (Node.js)      |
+                    |                  |
+                    |  - Validation    |
+                    |  - Turn Logic    |
+                    |  - Matchmaking   |
+                    +--------+---------+
+                             |
+                        Read/Write
+                             |
+                    +--------+---------+
+                    |      Redis       |
+                    |                  |
+                    |  - Game State    |
+                    |  - Pub/Sub       |
+                    |  - Sessions      |
+                    +------------------+
+```
+
+**Why this stack:**
+
+The entire frontend is vanilla JavaScript. No React. No Next.js. No build step. This was a deliberate choice -- card games need fast load times and precise animation control. Every framework abstraction is a frame you might drop. Shaw's original architecture was right about this and we kept it.
+
+Redis over PostgreSQL for game state because card games are write-heavy, read-heavy, and ephemeral. A match lasts 10-20 minutes. You don't need ACID compliance for something that expires in an hour. You need speed and pub/sub. Redis gives you both.
+
+WebSockets over REST because turn-based card games still need real-time updates. When your opponent plays a card, you need to see it now, not on your next poll cycle.
+
+---
+
+## Roadmap
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Core game engine | Done | Card mechanics, turn resolution, mana system |
+| Server-side validation | Done | Anti-cheat, move verification |
+| Multiplayer (Redis) | Done | Real-time sync, disconnect recovery |
+| Card animations | Done | CSS-driven, 60fps card movement |
+| Matchmaking | Done | Lobby system, game creation |
+| Token launch | Done | $FREELANCER on pump.fun, fair launch |
+| Advanced deck builder | Next | Card filtering, strategy presets, custom decks |
+| On-chain marketplace | Planned | Trade cards as Solana assets |
+| ELO ranked system | Planned | Competitive ladder, seasonal resets |
+| Tournament mode | Planned | Organized events, token prize pools |
+| AI opponents | Planned | Single-player powered by AI agents |
+| Mobile optimization | Planned | Responsive play on any device |
+
+---
+
+## Contributing
+
+The code is open source. Fork it, break it, improve it.
 
 ```bash
-bun run db:generate
+# Fork the repo, then:
+git clone https://github.com/YOUR_USERNAME/freelancer.git
+cd freelancer
+yarn install
+
+# Make your changes, then submit a PR
 ```
 
-This will create new migration files in the `drizzle` directory.
+We're particularly looking for contributions in:
 
-3. Apply migrations
+- Card balance and new card designs
+- UI/UX improvements
+- Performance optimization
+- Mobile responsiveness
+- Test coverage
 
-```bash
-bun run db:migrate
-```
+---
 
-This updates your local database with the new schema changes
+## Links
 
-### Working with Migrations
+| | |
+|---|---|
+| **Medium** | [Launch Announcement](https://medium.com/@freelancergame/freelancer-is-live-the-game-the-token-today-4dbc9d11cefe) |
+| **Twitter** | [@FreelancerGame](https://twitter.com/FreelancerGame) |
+| **Website** | [freelancergame](https://x.com/freelancergame) |
+| **Original Repo** | [github.com/lalalune/freelancer](https://github.com/lalalune/freelancer) |
+| **Shaw** | [@shawmakesmagic](https://twitter.com/shawmakesmagic) |
+| **Dev Address** | `miLtonJTjXf1v6ue3QGWmmJtYCjrKXuLg74bve2UeyC` |
 
-During development, you might create several migration files as you iterate on your schema. Before submitting a pull request, it's best practice to squash these into a single, clean migration.
+---
 
-**Squashing Migrations for a Pull Request**
+## Credits
 
-1.  **Identify Your New Migrations**: Take note of the new migration files you've added in your branch. These are the files you will consolidate.
+Freelancer was originally created by [Shaw Walters](https://twitter.com/shawmakesmagic), creator of [ElizaOS](https://github.com/elizaOS/eliza). Shaw commissioned the development of this version, funded the build, and endorses both the game and the token.
 
-2.  **Delete Your New Migration Files**: Remove the migration files (`drizzle/*.sql`) and the corresponding snnapshots (`drizzle/meta/####_snapshot.json`) and entries in `drizzle/meta/_journal.json` that were created from running `db:generate`.
+Built by the [@FreelancerGame](https://twitter.com/FreelancerGame) team.
 
-3.  **Generate a Single, Consolidated Migration**: Run the `db:generate` command again. This will create one new migration file that contains all of your schema changes.
+---
 
-    ```bash
-    bun run db:generate
-    ```
+<div align="center">
 
-4.  **Apply the New Migration**: Run the `migrate` command to apply the squashed migration to your local database.
+**No presale. No whitelist. No insiders. Just a game that works.**
 
-    ```bash
-    bun run db:migrate
-    ```
+MIT License
 
-5.  **Re-ingest Data (If Necessary)**: If your schema changes impact how data is structured, you may need to re-ingest data to reflect those changes correctly.
-    ```bash
-    # Example: Force re-ingestion for the last 7 days
-    bun run pipeline ingest --days 7 --force
-    ```
-
-**Handling Migration Errors**
-
-If you encounter errors during the migration process (e.g., "table already exists" or "no such column"), your local database may be out of sync. The most reliable way to fix this is to start fresh by resetting your local data and applying all migrations in order.
-
-1.  **Reset your local database**:
-    ```bash
-    rm data/db.sqlite
-    ```
-2.  **Sync with production data**: This gives you a clean, production-like state.
-    ```bash
-    bun run data:sync -y --remote upstream
-    ```
-3.  **Apply your new migration**:
-    ```bash
-    bun run db:migrate
-    ```
-
-### Database Explorer
-
-To interactively explore the database and its contents:
-
-```bash
-bun run db:studio
-```
-
-This launches Drizzle Studio, which provides a visual interface to browse tables, relationships, run queries, and export data.
-
-Additional setup required if you use Safari or Brave: https://orm.drizzle.team/docs/drizzle-kit-studio#safari-and-brave-support
-
-## Troubleshooting
-
-### Common Issues
-
-1. **"GITHUB_TOKEN environment variable is required"**
-
-   - Ensure your GitHub token is set in `.env` and the environment is loaded
-   - You can also run commands with the token directly: `GITHUB_TOKEN=your_token bun run pipeline ingest -d 10`
-   - GitHub Personal Access Token permissions:
-     - Contents: Read and write
-     - Metadata: (auto-enabled)
-     - Actions: Read and write
-     - Pages: Read and write
-
-2. **"No such table: repositories"**
-
-   - Run `bun run db:generate` and `bun run db:migrate` to initialize the database
-   - Ensure the `data` directory exists: `mkdir -p data`
-
-3. **"Error fetching data from GitHub"**
-
-   - Check your GitHub token has proper permissions
-   - Verify repository names are correct in config
-   - Ensure your token has not expired
-
-### Debugging
-
-For more detailed logs, add the `-v` or `--verbose` flag to any command:
-
-```bash
-bun run pipeline ingest -d 10 -v
-```
-
-## Directory Structure
-
-```
-.
-├── data/               # Generated data and reports
-│   └── db.sqlite       # SQLite database
-├── cli/                # CLI program for pipeline
-│   └── analyze-pipeline.ts  # Run typescript pipeline
-├── config/             # Configuration files
-│   └── pipeline.config.ts  # TypeScript pipeline configuration
-├── drizzle/            # Database migration files
-├── scripts/            # Utility scripts (see scripts/README.md)
-│   ├── daily-automation.sh    # Continuous daily pipeline automation
-│   ├── verify-data.sh         # Data quality verification
-│   └── fetch_github.py        # GitHub metrics collection
-├── src/
-│   ├── app/            # Next.js app router pages
-│   ├── components/     # React components
-│   │   └── ui/         # shadcn/ui components
-│   │
-│   └── lib/
-│       ├── pipelines/  # Modular pipeline system
-│       │   ├── contributors/  # Contributor-specific pipeline components
-│       │   ├── export/        # Pipelines to export JSON data
-│       │   ├── ingest/        # Data ingestion pipeline components
-│       │   ├── summarize/     # Pipelines to generate AI summaries
-│       ├── data/          # Data sources and storage
-│       │   ├── db.ts      # Database connection and configuration
-│       │   ├── github.ts  # GitHub API integration
-│       │   ├── ingestion.ts  # Data ingestion from GitHub API
-│       │   ├── schema.ts  # Database schema definitions
-│       │   └── types.ts   # Core data type definitions
-│       ├── logger.ts      # Logging system
-│       └── typeHelpers.ts # TypeScript helper utilities
-├── profiles/           # Generated static profiles
-└── .github/workflows   # Automation workflows
-```
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+</div>
